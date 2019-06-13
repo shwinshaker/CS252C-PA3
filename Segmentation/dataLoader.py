@@ -51,9 +51,11 @@ class BatchLoader(Dataset ):
         labelName = self.labelNames[self.perm[ind] ]
 
         im = self.loadImage(imName )
-        label, labelIndex, mask = self.loadLabel(labelName )
+        label, labelIndex, mask, labelIndex_ = self.loadLabel(labelName )
 
         # If image size is given, randomly crop the images
+        # self.imHeight = im.shape[1] // 2
+        # self.imWidth = im.shape[2] // 2
         if not (self.imHeight is None or self.imWidth is None):
             nrows, ncols = im.shape[1], im.shape[2]
             gapH = (nrows - self.imHeight )
@@ -65,6 +67,7 @@ class BatchLoader(Dataset ):
             label = label[:, rs:rs+self.imHeight, cs:cs+self.imWidth]
             labelIndex = labelIndex[:, rs:rs+self.imHeight, cs:cs+self.imWidth ]
             mask = mask[:, rs:rs+self.imHeight, cs:cs+self.imWidth ]
+            labelIndex_ = labelIndex_[:, rs:rs+self.imHeight, cs:cs+self.imWidth ]
 
         ## Load data
         # im: input immage batch, Nx3ximHeightximWidth
@@ -76,7 +79,8 @@ class BatchLoader(Dataset ):
                 'im' : im,
                 'label': label,
                 'labelIndex': labelIndex,
-                'mask': mask
+                'mask': mask,
+                'labelIndexRaw': labelIndex_
                 }
         return batchDict
 
@@ -132,6 +136,8 @@ class BatchLoader(Dataset ):
             labelIndex = cv2.resize(labelIndex, (ncols, nrows), interpolation=cv2.INTER_NEAREST )
 
         labelIndex = labelIndex.astype(np.int64 )
+        labelIndex_ = np.copy(labelIndex)
+        labelIndex_ = labelIndex_[np.newaxis, :, :]
 
         nrows, ncols = labelIndex.shape[0], labelIndex.shape[1]
         xIndex, yIndex = np.meshgrid(np.arange(0, ncols), np.arange(0, nrows) )
@@ -142,8 +148,10 @@ class BatchLoader(Dataset ):
         labelIndex[labelIndex == 255] = 0
         labelIndex = labelIndex[np.newaxis, :, :]
 
+        # a one-hot encoding of the classes
+        # shape: width of image * height of image * number of classes
         label = np.zeros([self.numClasses, nrows, ncols], dtype = np.float32 )
         label[labelIndex.flatten(), yIndex.flatten(), xIndex.flatten()] = 1.0
         label = label * mask
 
-        return label, labelIndex, mask
+        return label, labelIndex, mask, labelIndex_
